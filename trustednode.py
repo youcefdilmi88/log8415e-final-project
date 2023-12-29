@@ -57,6 +57,14 @@ def start_trusted_node_server():
             # Establish a connection with Gatekeeper
             clientsocket, addr = gatekeeper_socket.accept()
             print(f"Got a connection from {addr}")
+
+            key = clientsocket.recv(1024).decode('utf-8')
+            if key != 'your_pre_shared_key':
+                print("Invalid key. Connection closed.")
+                clientsocket.send('Invalid key. Connection closed.'.encode('utf-8'))
+                clientsocket.close()
+                continue
+
             query = clientsocket.recv(1024).decode('utf-8')
 
             # Send query to proxy server
