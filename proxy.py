@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import socket
 import random
 import sys
@@ -7,6 +9,7 @@ import argparse
 import subprocess
 import re
 import datetime
+import ssl
 
 # SQL server configurations
 sql_servers = {
@@ -79,7 +82,7 @@ def forward_query(query):
 
     chosen_host = choose_server(query)
     config = sql_servers[chosen_host]
-    print(f"Forwarding query to {config['name']}")
+    print(f"Forwarding query to {chosen_host}")
 
     try:
         # Connect to the database
@@ -108,45 +111,48 @@ def forward_query(query):
         print(f"Error while forwarding query to {chosen_host}: {e}")
         return {'error': str(e)}
 
-# Setting up the proxy server
 def start_proxy_server():
     try:
-        # Create a socket object
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # SSL Context creation and configuration
+        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        context.load_cert_chain(certfile='proxy_cert.pem', keyfile='proxy_key.key')
         
-        # Bind to '0.0.0.0' to listen on all network interfaces
-        host = '0.0.0.0'
-        port = 5000
-        s.bind((host, port))
-
-        # Get the actual port number assigned
-        port = s.getsockname()[1]
-        print(f"Proxy Server listening on port {port}")
+        # Create a socket object
+        trusted_node_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        trusted_node_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        
+        # Bind to '0.0.0.0', port 5000
+        trusted_node_socket.bind(('0.0.0.0', 5000))
+        
+        # Wrap the socket with SSL
+        s_ssl = context.wrap_socket(trusted_node_socket, server_side=True)
 
         # Listen to Trusted node requests and queue up to 5 requests
-        s.listen(5)
+        s_ssl.listen(5)
+        print(f"Proxy Server listening on port 5000")
 
         while True:
-            # Establish a connection
-            clientsocket, addr = s.accept()
-            print(f"Got a connection from {addr}")
+            # Accept a connection with the Trusted node
+            secure_socket, addr = s_ssl.accept()
+            print(f"Got a secure secure connection from {addr}")
 
-            query = clientsocket.recv(1024).decode('utf-8')
+            # Receive query from Gatekeeper
+            query = secure_socket.recv(1024).decode('utf-8')
             result = forward_query(query)
 
             # Sending the result back to the Trusted node
-            clientsocket.send(json.dumps(result).encode('utf-8'))
+            secure_socket.send(json.dumps(result).encode('utf-8'))
 
-            clientsocket.close()
+            secure_socket.close()
 
     except Exception as e:
         print("Error:", e)
         sys.exit(1)
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='SQL Proxy Server')
-    parser.add_argument('--mode', type=str, choices=['random', 'directhit', 'customized'], default='random',
+    parser.add_argument('--mode', type=str, choices=['random', 'directhit', 'customized', 'loadbalance'], default='random',
                         help='Server selection mode: random, directhit, customized, loadbalance')
     args = parser.parse_args()
     server_selection_mode = args.mode

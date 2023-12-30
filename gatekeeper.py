@@ -1,34 +1,49 @@
+#!/usr/bin/env python3
+
 import socket
 import json
+import ssl
+
+
 
 def send_query(query):
     try:
-        # Create a socket object for outgoing requests to the Trusted node
-        trusted_node_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
         # Trusted node hostname and port
         host = 'ip-172-31-90-19.ec2.internal'
         port = 5000
 
-        # Establish a connection to the Trusted node
-        trusted_node_socket.connect((host, port))
+        # Create an SSL context
+        context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+
+        # Load the CA certificate
+        context.load_verify_locations('trusted_node_cert.pem')
+
+        # Create a socket object for outgoing requests to the Trusted node
+        trusted_node_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # Wrap the socket with SSL
+        secure_socket = context.wrap_socket(trusted_node_socket, server_hostname=host)
+
+        # Establish a secure connection to the Trusted node
+        secure_socket.connect((host, port))
 
         # Authenticate the Gatekeeper to the Trusted node
-        trusted_node_socket.send('pre_shared_key'.encode('utf-8'))
+        secure_socket.send('pre_shared_key'.encode('utf-8'))
 
         # Send the query to the Trusted node
-        trusted_node_socket.send(query.encode('utf-8'))
+        secure_socket.send(query.encode('utf-8'))
 
         # Receiving the response from the Trusted node and process the response
-        response = trusted_node_socket.recv(4096).decode('utf-8')
+        response = secure_socket.recv(4096).decode('utf-8')
         result = json.loads(response)
         print("Query Result:", result)
 
-        # Close the connection with the Trusted node
-        trusted_node_socket.close()
+        # Close the secure connection with the Trusted node
+        secure_socket.close()
 
     except Exception as e:
         print("Error:", e)
+
 
 def main():
     while True:
