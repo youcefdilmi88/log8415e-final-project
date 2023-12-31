@@ -6,6 +6,15 @@ import ssl
 import sys
 
 def send_query_to_proxy(query):
+    """
+    Send a SQL query to the proxy server and receive the response.
+
+    Args:
+        query (str): The SQL query to be sent to the proxy server.
+
+    Returns:
+        dict: The response from the proxy server or an error message if the request fails.
+    """
     try:
         # Proxy hostname and port
         host= 'ip-172-31-95-113.ec2.internal'
@@ -57,6 +66,14 @@ def send_query_to_proxy(query):
 
 
 def start_trusted_node_server():
+    """
+    Start the Trusted Node Server to handle incoming connections.
+
+    This server listens for connections from a Gatekeeper, verifies the pre-shared key, 
+    and forwards received SQL queries to the proxy server. It then sends the query results back to the Gatekeeper.
+    
+    The server uses SSL for secure communication.
+    """
     try:
 
       # Create a socket object
@@ -116,6 +133,9 @@ def start_trusted_node_server():
 
 
 def main():
+    """
+    Main function to start the Trusted Node Server.
+    """
     start_trusted_node_server()   
 
 if __name__ == '__main__':

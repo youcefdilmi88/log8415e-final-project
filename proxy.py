@@ -11,7 +11,7 @@ import re
 import datetime
 import ssl
 
-# SQL server configurations
+# SQL server configurations with details for worker and manager nodes.
 sql_servers = {
     'Worker1': { 'host': 'ip-172-31-95-107.ec2.internal', 'user': 'root', 'password': 'hello', 'database': 'sakila'},
     'Worker2': { 'host': 'ip-172-31-93-149.ec2.internal', 'user': 'root', 'password': 'hello', 'database': 'sakila'},
@@ -22,12 +22,28 @@ sql_servers = {
 # Global variable to store server selection mode
 server_selection_mode = "random"
 
-# Function to choose a random  worker server
 def random_worker():
+    """
+    Choose a random worker server from the available SQL servers.    
+    
+    Returns:
+        str: The name of the selected server.
+    """
     return random.choice(list(sql_servers.keys())[:3])
 
-# Function to choose a server based on the specified mode
 def choose_server(query):
+    """
+    Choose a server based on the specified mode.
+    
+    Args:
+        query (str): The SQL query to be executed.
+    
+    Returns:
+        str: The name of the selected server.
+        
+    Raises:
+        ValueError: If the server selection mode is unknown.
+    """
     if server_selection_mode == "random":
         return random_worker()
     elif server_selection_mode == "directhit":
@@ -39,8 +55,13 @@ def choose_server(query):
     else:
         raise ValueError("Unknown server selection mode")
 
-# Function to choose the server with the lowest latency
 def choose_lowest_latency_server():
+    """
+    Choose the server with the lowest latency based on ping response times.
+    
+    Returns:
+        str: The name of the server with the lowest latency.
+    """
     lowest_latency = float('inf')
     chosen_host = None
     for host in random_worker():  # Exclude host4
@@ -55,8 +76,16 @@ def choose_lowest_latency_server():
             continue
     return chosen_host if chosen_host else random_worker()
 
-# Function to parse ping response and extract latency
 def parse_ping_response(ping_output):
+    """
+    Parse ping response to extract the latency.
+    
+    Args:
+        ping_output (str): The output from the ping command.
+        
+    Returns:
+        float: The latency extracted from the ping output, or None if no latency found.
+    """
     time_pattern = r'time=(\d+\.\d+) ms'
 
     # Search for the pattern
@@ -69,17 +98,32 @@ def parse_ping_response(ping_output):
         return None
     pass
 
-# Function to choose the server for load balancing
 def choose_load_balance_server(query):
+    """
+    Choose the server for load balancing based on the query type.
+    
+    Args:
+        query (str): The SQL query to be executed.
+    
+    Returns:
+        str: The name of the server based on the load balancing strategy.
+    """
     print("Choosing load balance server")
     if query.strip().lower().startswith("select"):
         return random_worker() # Random worker for SELECT queries
     else:
         return 'Manager' # Manager for other queries
 
-# Function to forward query to SQL server
 def forward_query(query):
-
+    """
+    Forward the received SQL query to the chosen SQL server and return the result.
+    
+    Args:
+        query (str): The SQL query to be executed.
+    
+    Returns:
+        dict: The result of the executed query or error if any.
+    """
     print(f"Received query: {query}")
 
     chosen_host = choose_server(query)
@@ -117,6 +161,12 @@ def forward_query(query):
         return {'error': str(e)}
 
 def start_proxy_server():
+    """
+    Start the proxy server to handle incoming SQL queries, forward them to the appropriate SQL server,
+    and send the responses back to the client.
+    
+    The server uses SSL for secure communication.
+    """
     try:
         # Create a socket object
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -165,6 +215,21 @@ def start_proxy_server():
 
 
 if __name__ == '__main__':
+    """
+    Main entry point of the script.
+    
+    Parses command line arguments to set the server selection mode and starts the proxy server.
+    The server selection mode determines how the proxy chooses which SQL server to forward requests to.
+    
+    Available modes are:
+    - 'random': Chooses a random worker server.
+    - 'directhit': Always chooses the manager server.
+    - 'customized': Chooses the server with the lowest latency based on ping times.
+    - 'loadbalance': Chooses a server based on load balancing strategy for query type.
+    
+    The proxy server listens for incoming connections on port 5000, securely forwarding SQL queries
+    to the chosen SQL server and returning the results to the client.
+    """
     parser = argparse.ArgumentParser(description='SQL Proxy Server')
     parser.add_argument('--mode', type=str, choices=['random', 'directhit', 'customized', 'loadbalance'], default='random',
                         help='Server selection mode: random, directhit, customized, loadbalance')

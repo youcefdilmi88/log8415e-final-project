@@ -7,6 +7,18 @@ import ssl
 
 
 def send_query(query):
+    """
+    Send a SQL query to the Trusted Node and receive the response.
+
+    This function creates a secure SSL connection to the Trusted Node, sends a pre-shared key for authentication, 
+    and then receives the query response. This function also prints the response to query in the console.
+
+    Args:
+        query (str): The SQL query to be sent to the Trusted Node.
+
+    Returns:
+        dict: The response from the Trusted Node or an error message if the request fails.
+    """
     try:
         # Trusted node hostname and port
         host = 'ip-172-31-90-19.ec2.internal'
@@ -49,6 +61,12 @@ def send_query(query):
 
 
 def main():
+    """
+    Main function to interactively send SQL queries to the Trusted Node.
+
+    Continuously prompts the user for SQL queries and sends them to the Trusted Node using the 'send_query' function. 
+    The loop can be exited by typing 'exit'.
+    """
     while True:
         query = input("Enter SQL query (or type 'exit' to quit): ")
         if query.lower() == 'exit':
